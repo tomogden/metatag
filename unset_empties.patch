@@ -1,0 +1,60 @@
+diff --git a/metatag.module b/metatag.module
+index 9f3a46f..5eebeb0 100644
+--- a/metatag.module
++++ b/metatag.module
+@@ -283,6 +283,26 @@ function metatag_config_load_multiple(array $instances) {
+     }
+   }
+ 
++  // Remove tag empty values from configs which defeat the array merging
++  // logic and overwrite the non-empty values in the hierarchy above.
++  // These are typically values that were filled in and later deleted.
++  foreach ($configs as $config_name => $config) {
++    // Skip global, as this is at the top of the hierarchy.
++    if($config_name == 'global') {
++      continue;
++    }
++    foreach($config->config as $tag_name => $tag_values) {
++      if (in_array('', $tag_values)) {
++        foreach($tag_values as $values_index => $index_value) {
++          if (empty($index_value)) {
++            unset($config->config[$tag_name][$values_index]);
++          }
++        }
++        $config->config = array_filter($config->config);
++      }
++    }
++  }
++
+   return $configs;
+ }
+ 
+@@ -1275,7 +1295,7 @@ function metatag_metatags_form(array &$form, $instance, array $metatags = array(
+ /**
+  * Form API submission callback.
+  *
+- * Unset meta tag values that equal their default values, and load any
++ * Unset meta tag values that equal their default values or are empty. Load any
+  * additional meta tag values for other languages so that they can be properly
+  * saved later on.
+  *
+@@ -1920,7 +1940,7 @@ function metatag_config_instance_info($instance = NULL) {
+ }
+ 
+ /**
+- * Filter out meta tag values that equal the default values.
++ * Filter out meta tag values that equal the default values or that are empty.
+  *
+  * @todo Use information in $values[$metatag]['default'] rather than a $defaults parameter.
+  */
+@@ -1931,8 +1951,8 @@ function metatag_filter_values_from_defaults(array &$values, array $defaults = a
+       // Meta tag has a default, and it matches user-submitted value.
+       unset($values[$metatag]);
+     }
+-    elseif (!isset($default) && (is_string($data['value']) && !drupal_strlen($data['value']) || (is_array($data['value']) && !array_filter($data['value'])))) {
+-      // Metatag does not have a default, and user did not submit a value.
++    elseif ((is_string($data['value']) && !drupal_strlen($data['value']) || (is_array($data['value']) && !array_filter($data['value'])))) {
++      // User did not submit a value.
+       unset($values[$metatag]);
+     }
+     if (isset($values[$metatag]['default'])) {
